@@ -9,6 +9,7 @@ import { ProjectionTable } from "@/components/dcf/ProjectionTable";
 import { ValuationSummary } from "@/components/dcf/ValuationSummary";
 import { SensitivityGrid } from "@/components/dcf/SensitivityGrid";
 import { FcfChart } from "@/components/dcf/FcfChart";
+import { RevenueEbitdaChart } from "@/components/dcf/RevenueEbitdaChart";
 import { Section } from "@/components/dcf/fields";
 import { getCompanyFinancials } from "@/lib/marketdata.functions";
 import { defaultAssumptions, sensitivity, valuate, type Assumptions } from "@/lib/dcf";
