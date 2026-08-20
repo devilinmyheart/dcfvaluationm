@@ -106,6 +106,9 @@ function Index() {
               <Section title="Free cash flow projection">
                 <ProjectionTable v={valuation} currency={currency} />
               </Section>
+              <Section title="Revenue & EBITDA forecast">
+                <RevenueEbitdaChart v={valuation} currency={currency} />
+              </Section>
               <Section title="Projected vs discounted cash flow">
                 <FcfChart v={valuation} currency={currency} />
               </Section>
