@@ -5,6 +5,8 @@ export function ProjectionTable({ v, currency }: { v: Valuation; currency: strin
   const rows: { label: string; get: (i: number) => string }[] = [
     { label: "Revenue growth", get: (i) => fmtPct(v.rows[i]!.growth) },
     { label: "Revenue", get: (i) => fmtMoney(v.rows[i]!.revenue, currency) },
+    { label: "EBITDA", get: (i) => fmtMoney(v.rows[i]!.ebitda, currency) },
+    { label: "EBITDA margin", get: (i) => fmtPct(v.rows[i]!.revenue ? v.rows[i]!.ebitda / v.rows[i]!.revenue : NaN) },
     { label: "EBIT", get: (i) => fmtMoney(v.rows[i]!.ebit, currency) },
     { label: "NOPAT", get: (i) => fmtMoney(v.rows[i]!.nopat, currency) },
     { label: "+ D&A", get: (i) => fmtMoney(v.rows[i]!.da, currency) },
