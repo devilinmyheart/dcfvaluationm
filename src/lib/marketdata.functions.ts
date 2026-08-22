@@ -29,27 +29,18 @@ async function fmp(path: string, params: Record<string, string>, apiKey: string)
   return (parsed as Json[]) ?? [];
 }
 
-/** Tries the modern `/stable` endpoint first, falls back to legacy `/api/v3`. */
-async function fetchWithFallback(
+/** Uses the current `/stable` API (legacy `/api/v3` endpoints are retired). */
+async function fetchStable(
   stablePath: string,
-  legacyPath: string,
   symbol: string,
   apiKey: string,
   limit?: number,
 ): Promise<Json[]> {
-  const stableParams: Record<string, string> = { symbol };
-  if (limit) stableParams["limit"] = String(limit);
-  try {
-    const rows = await fmp(stablePath, stableParams, apiKey);
-    if (rows.length) return rows;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!/40[0-3]|legacy|Exclusive Endpoint|not available/i.test(message)) throw err;
-  }
-  const legacyParams: Record<string, string> = {};
-  if (limit) legacyParams["limit"] = String(limit);
-  return fmp(`${legacyPath}/${encodeURIComponent(symbol)}`, legacyParams, apiKey);
+  const params: Record<string, string> = { symbol };
+  if (limit) params["limit"] = String(limit);
+  return fmp(stablePath, params, apiKey);
 }
+
 
 export const getCompanyFinancials = createServerFn({ method: "GET" })
   .inputValidator((input: { symbol: string }) => {
@@ -65,17 +56,12 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
     const { symbol } = data;
 
     const [profileRows, income, cashflow, balance] = await Promise.all([
-      fetchWithFallback("/stable/profile", "/api/v3/profile", symbol, apiKey),
-      fetchWithFallback("/stable/income-statement", "/api/v3/income-statement", symbol, apiKey, 6),
-      fetchWithFallback("/stable/cash-flow-statement", "/api/v3/cash-flow-statement", symbol, apiKey, 6),
-      fetchWithFallback(
-        "/stable/balance-sheet-statement",
-        "/api/v3/balance-sheet-statement",
-        symbol,
-        apiKey,
-        6,
-      ),
+      fetchStable("/stable/profile", symbol, apiKey),
+      fetchStable("/stable/income-statement", symbol, apiKey, 6),
+      fetchStable("/stable/cash-flow-statement", symbol, apiKey, 6),
+      fetchStable("/stable/balance-sheet-statement", symbol, apiKey, 6),
     ]);
+
 
     const profile = profileRows[0];
     if (!profile || !income.length) {
