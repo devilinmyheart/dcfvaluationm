@@ -133,3 +133,49 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
       history,
     };
   });
+
+export type CompanyMatch = {
+  symbol: string;
+  name: string;
+  exchange: string;
+  currency: string;
+};
+
+export const searchCompanies = createServerFn({ method: "GET" })
+  .inputValidator((input: { query: string }) => {
+    const q = String(input?.query ?? "").trim().slice(0, 60);
+    return { query: q };
+  })
+  .handler(async ({ data }): Promise<CompanyMatch[]> => {
+    const apiKey = process.env["FMP_API_KEY"];
+    if (!apiKey || data.query.length < 2) return [];
+
+    const safe = async (path: string): Promise<Json[]> => {
+      try {
+        return await fmp(path, { query: data.query, limit: "10" }, apiKey);
+      } catch {
+        return [];
+      }
+    };
+
+    const [byName, bySymbol] = await Promise.all([
+      safe("/stable/search-name"),
+      safe("/stable/search-symbol"),
+    ]);
+
+    const seen = new Set<string>();
+    const out: CompanyMatch[] = [];
+    for (const r of [...bySymbol, ...byName]) {
+      const symbol = String(r["symbol"] ?? "").toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      out.push({
+        symbol,
+        name: String(r["name"] ?? r["companyName"] ?? symbol),
+        exchange: String(r["exchangeFullName"] ?? r["exchange"] ?? ""),
+        currency: String(r["currency"] ?? ""),
+      });
+      if (out.length >= 8) break;
+    }
+    return out;
+  });
