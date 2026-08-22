@@ -13,8 +13,14 @@ async function fmp(path: string, params: Record<string, string>, apiKey: string)
   const res = await fetch(`https://financialmodelingprep.com${path}?${qs}`);
   const text = await res.text();
   if (!res.ok) {
+    if (res.status === 402 || res.status === 403) {
+      throw new Error(
+        "This ticker isn't available on the current market data plan. Try a large US-listed company such as AAPL or MSFT.",
+      );
+    }
     throw new Error(`Market data request failed [${res.status}]: ${text.slice(0, 300)}`);
   }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -132,4 +138,50 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
       cash: num(latestBs["cashAndShortTermInvestments"] ?? latestBs["cashAndCashEquivalents"]),
       history,
     };
+  });
+
+export type CompanyMatch = {
+  symbol: string;
+  name: string;
+  exchange: string;
+  currency: string;
+};
+
+export const searchCompanies = createServerFn({ method: "GET" })
+  .inputValidator((input: { query: string }) => {
+    const q = String(input?.query ?? "").trim().slice(0, 60);
+    return { query: q };
+  })
+  .handler(async ({ data }): Promise<CompanyMatch[]> => {
+    const apiKey = process.env["FMP_API_KEY"];
+    if (!apiKey || data.query.length < 2) return [];
+
+    const safe = async (path: string): Promise<Json[]> => {
+      try {
+        return await fmp(path, { query: data.query, limit: "10" }, apiKey);
+      } catch {
+        return [];
+      }
+    };
+
+    const [byName, bySymbol] = await Promise.all([
+      safe("/stable/search-name"),
+      safe("/stable/search-symbol"),
+    ]);
+
+    const seen = new Set<string>();
+    const out: CompanyMatch[] = [];
+    for (const r of [...bySymbol, ...byName]) {
+      const symbol = String(r["symbol"] ?? "").toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      out.push({
+        symbol,
+        name: String(r["name"] ?? r["companyName"] ?? symbol),
+        exchange: String(r["exchangeFullName"] ?? r["exchange"] ?? ""),
+        currency: String(r["currency"] ?? ""),
+      });
+      if (out.length >= 8) break;
+    }
+    return out;
   });
