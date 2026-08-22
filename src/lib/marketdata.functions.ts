@@ -13,8 +13,14 @@ async function fmp(path: string, params: Record<string, string>, apiKey: string)
   const res = await fetch(`https://financialmodelingprep.com${path}?${qs}`);
   const text = await res.text();
   if (!res.ok) {
+    if (res.status === 402 || res.status === 403) {
+      throw new Error(
+        "This ticker isn't available on the current market data plan. Try a large US-listed company such as AAPL or MSFT.",
+      );
+    }
     throw new Error(`Market data request failed [${res.status}]: ${text.slice(0, 300)}`);
   }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
