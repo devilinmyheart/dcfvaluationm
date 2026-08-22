@@ -56,17 +56,12 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
     const { symbol } = data;
 
     const [profileRows, income, cashflow, balance] = await Promise.all([
-      fetchWithFallback("/stable/profile", "/api/v3/profile", symbol, apiKey),
-      fetchWithFallback("/stable/income-statement", "/api/v3/income-statement", symbol, apiKey, 6),
-      fetchWithFallback("/stable/cash-flow-statement", "/api/v3/cash-flow-statement", symbol, apiKey, 6),
-      fetchWithFallback(
-        "/stable/balance-sheet-statement",
-        "/api/v3/balance-sheet-statement",
-        symbol,
-        apiKey,
-        6,
-      ),
+      fetchStable("/stable/profile", symbol, apiKey),
+      fetchStable("/stable/income-statement", symbol, apiKey, 6),
+      fetchStable("/stable/cash-flow-statement", symbol, apiKey, 6),
+      fetchStable("/stable/balance-sheet-statement", symbol, apiKey, 6),
     ]);
+
 
     const profile = profileRows[0];
     if (!profile || !income.length) {
