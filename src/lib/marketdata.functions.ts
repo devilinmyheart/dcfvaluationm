@@ -57,9 +57,9 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
 
     const [profileRows, income, cashflow, balance] = await Promise.all([
       fetchStable("/stable/profile", symbol, apiKey),
-      fetchStable("/stable/income-statement", symbol, apiKey, 6),
-      fetchStable("/stable/cash-flow-statement", symbol, apiKey, 6),
-      fetchStable("/stable/balance-sheet-statement", symbol, apiKey, 6),
+      fetchStable("/stable/income-statement", symbol, apiKey, 5),
+      fetchStable("/stable/cash-flow-statement", symbol, apiKey, 5),
+      fetchStable("/stable/balance-sheet-statement", symbol, apiKey, 5),
     ]);
 
 
