@@ -29,27 +29,18 @@ async function fmp(path: string, params: Record<string, string>, apiKey: string)
   return (parsed as Json[]) ?? [];
 }
 
-/** Tries the modern `/stable` endpoint first, falls back to legacy `/api/v3`. */
-async function fetchWithFallback(
+/** Uses the current `/stable` API (legacy `/api/v3` endpoints are retired). */
+async function fetchStable(
   stablePath: string,
-  legacyPath: string,
   symbol: string,
   apiKey: string,
   limit?: number,
 ): Promise<Json[]> {
-  const stableParams: Record<string, string> = { symbol };
-  if (limit) stableParams["limit"] = String(limit);
-  try {
-    const rows = await fmp(stablePath, stableParams, apiKey);
-    if (rows.length) return rows;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!/40[0-3]|legacy|Exclusive Endpoint|not available/i.test(message)) throw err;
-  }
-  const legacyParams: Record<string, string> = {};
-  if (limit) legacyParams["limit"] = String(limit);
-  return fmp(`${legacyPath}/${encodeURIComponent(symbol)}`, legacyParams, apiKey);
+  const params: Record<string, string> = { symbol };
+  if (limit) params["limit"] = String(limit);
+  return fmp(stablePath, params, apiKey);
 }
+
 
 export const getCompanyFinancials = createServerFn({ method: "GET" })
   .inputValidator((input: { symbol: string }) => {
