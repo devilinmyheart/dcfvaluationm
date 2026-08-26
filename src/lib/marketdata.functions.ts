@@ -53,20 +53,40 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
     const symbol = String(input?.symbol ?? "")
       .trim()
       .toUpperCase();
-    if (!/^[A-Z0-9.\-^]{1,12}$/.test(symbol)) throw new Error("Enter a valid ticker symbol.");
+    if (!/^[A-Z0-9.\-^]{1,15}$/.test(symbol)) throw new Error("Enter a valid ticker symbol.");
     return { symbol };
   })
   .handler(async ({ data }): Promise<CompanyFinancials> => {
-    const apiKey = process.env["FMP_API_KEY"];
-    if (!apiKey) throw new Error("Market data API key is not configured.");
     const { symbol } = data;
+    const apiKey = process.env["FMP_API_KEY"];
 
+    const yahoo = async (): Promise<CompanyFinancials> => {
+      const { fetchYahooFinancials } = await import("./yahoo.server");
+      return fetchYahooFinancials(symbol);
+    };
+
+    if (!apiKey) return yahoo();
+
+    try {
+      return await fetchFromFmp(symbol, apiKey);
+    } catch (err) {
+      try {
+        return await yahoo();
+      } catch {
+        throw err instanceof Error ? err : new Error(`No financial data found for "${symbol}".`);
+      }
+    }
+  });
+
+async function fetchFromFmp(symbol: string, apiKey: string): Promise<CompanyFinancials> {
+  {
     const [profileRows, income, cashflow, balance] = await Promise.all([
       fetchStable("/stable/profile", symbol, apiKey),
       fetchStable("/stable/income-statement", symbol, apiKey, 5),
       fetchStable("/stable/cash-flow-statement", symbol, apiKey, 5),
       fetchStable("/stable/balance-sheet-statement", symbol, apiKey, 5),
     ]);
+
 
 
     const profile = profileRows[0];
@@ -138,7 +158,9 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
       cash: num(latestBs["cashAndShortTermInvestments"] ?? latestBs["cashAndCashEquivalents"]),
       history,
     };
-  });
+  }
+}
+
 
 export type CompanyMatch = {
   symbol: string;
@@ -154,9 +176,10 @@ export const searchCompanies = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<CompanyMatch[]> => {
     const apiKey = process.env["FMP_API_KEY"];
-    if (!apiKey || data.query.length < 2) return [];
+    if (data.query.length < 2) return [];
 
     const safe = async (path: string): Promise<Json[]> => {
+      if (!apiKey) return [];
       try {
         return await fmp(path, { query: data.query, limit: "10" }, apiKey);
       } catch {
@@ -164,24 +187,39 @@ export const searchCompanies = createServerFn({ method: "GET" })
       }
     };
 
-    const [byName, bySymbol] = await Promise.all([
+    const yahoo = async (): Promise<CompanyMatch[]> => {
+      try {
+        const { searchYahoo } = await import("./yahoo.server");
+        return await searchYahoo(data.query);
+      } catch {
+        return [];
+      }
+    };
+
+    const [byName, bySymbol, global] = await Promise.all([
       safe("/stable/search-name"),
       safe("/stable/search-symbol"),
+      yahoo(),
     ]);
 
     const seen = new Set<string>();
     const out: CompanyMatch[] = [];
+    const push = (m: CompanyMatch) => {
+      if (!m.symbol || seen.has(m.symbol) || out.length >= 10) return;
+      seen.add(m.symbol);
+      out.push(m);
+    };
+
     for (const r of [...bySymbol, ...byName]) {
-      const symbol = String(r["symbol"] ?? "").toUpperCase();
-      if (!symbol || seen.has(symbol)) continue;
-      seen.add(symbol);
-      out.push({
-        symbol,
-        name: String(r["name"] ?? r["companyName"] ?? symbol),
+      push({
+        symbol: String(r["symbol"] ?? "").toUpperCase(),
+        name: String(r["name"] ?? r["companyName"] ?? r["symbol"] ?? ""),
         exchange: String(r["exchangeFullName"] ?? r["exchange"] ?? ""),
         currency: String(r["currency"] ?? ""),
       });
-      if (out.length >= 8) break;
     }
+    for (const m of global) push(m);
+
     return out;
   });
+

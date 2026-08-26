@@ -1,5 +1,6 @@
 import type { Valuation } from "@/lib/dcf";
-import { fmtMoney, fmtPct, fmtPrice } from "@/lib/dcf";
+import { currencySymbol, fmtMoney, fmtPct, fmtPrice } from "@/lib/dcf";
+
 
 export function ValuationSummary({
   v,
@@ -14,7 +15,9 @@ export function ValuationSummary({
   netDebt: number;
   shares: number;
 }) {
+  const sym = currencySymbol(currency);
   const upside = price > 0 ? v.intrinsicPerShare / price - 1 : Number.NaN;
+
   const verdict = !Number.isFinite(upside)
     ? { label: "Not computable", tone: "text-muted-foreground" }
     : upside > 0.15
@@ -24,11 +27,11 @@ export function ValuationSummary({
         : { label: "Fairly valued", tone: "text-primary" };
 
   const bridge = [
-    { label: "PV of forecast FCF", value: fmtMoney(v.pvOfFcf, currency) },
-    { label: "PV of terminal value", value: fmtMoney(v.pvOfTerminal, currency) },
-    { label: "Enterprise value", value: fmtMoney(v.enterpriseValue, currency), strong: true },
-    { label: "− Net debt", value: fmtMoney(-netDebt, currency) },
-    { label: "Equity value", value: fmtMoney(v.equityValue, currency), strong: true },
+    { label: "PV of forecast FCF", value: fmtMoney(v.pvOfFcf, sym) },
+    { label: "PV of terminal value", value: fmtMoney(v.pvOfTerminal, sym) },
+    { label: "Enterprise value", value: fmtMoney(v.enterpriseValue, sym), strong: true },
+    { label: "− Net debt", value: fmtMoney(-netDebt, sym) },
+    { label: "Equity value", value: fmtMoney(v.equityValue, sym), strong: true },
     { label: "÷ Diluted shares", value: fmtMoney(shares, "") },
   ];
 
@@ -36,9 +39,10 @@ export function ValuationSummary({
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Intrinsic value per share</p>
-        <p className="num mt-1 text-4xl font-semibold text-foreground">{fmtPrice(v.intrinsicPerShare, currency === "USD" ? "$" : "")}</p>
+        <p className="num mt-1 text-4xl font-semibold text-foreground">{fmtPrice(v.intrinsicPerShare, sym)}</p>
         <div className="mt-3 flex items-baseline gap-3 text-sm">
-          <span className="text-muted-foreground">Market {fmtPrice(price)}</span>
+          <span className="text-muted-foreground">Market {fmtPrice(price, sym)}</span>
+
           <span className={`num font-semibold ${upside >= 0 ? "text-positive" : "text-negative"}`}>
             {Number.isFinite(upside) ? `${upside >= 0 ? "+" : ""}${fmtPct(upside)}` : "n/a"}
           </span>

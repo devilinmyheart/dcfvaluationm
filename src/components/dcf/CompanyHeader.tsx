@@ -1,17 +1,19 @@
 import type { CompanyFinancials } from "@/lib/dcf";
-import { fmtMoney, fmtPrice } from "@/lib/dcf";
+import { currencySymbol, fmtMoney, fmtPrice } from "@/lib/dcf";
 
 export function CompanyHeader({ f }: { f: CompanyFinancials }) {
   const latest = f.history[f.history.length - 1];
+  const sym = currencySymbol(f.currency);
   const items = [
-    { label: "Price", value: fmtPrice(f.price) },
-    { label: "Market cap", value: fmtMoney(f.marketCap) },
+    { label: "Price", value: fmtPrice(f.price, sym) },
+    { label: "Market cap", value: fmtMoney(f.marketCap, sym) },
     { label: "Beta", value: f.beta.toFixed(2) },
-    { label: "Net debt", value: fmtMoney(f.totalDebt - f.cash) },
-    { label: `Revenue FY${latest?.year ?? ""}`, value: fmtMoney(latest?.revenue ?? 0) },
-    { label: "Trailing FCF", value: fmtMoney(latest?.freeCashFlow ?? 0) },
+    { label: "Net debt", value: fmtMoney(f.totalDebt - f.cash, sym) },
+    { label: `Revenue FY${latest?.year ?? ""}`, value: fmtMoney(latest?.revenue ?? 0, sym) },
+    { label: "Trailing FCF", value: fmtMoney(latest?.freeCashFlow ?? 0, sym) },
     { label: "Diluted shares", value: fmtMoney(f.sharesOutstanding, "") },
   ];
+
 
   return (
     <div className="rounded-lg border border-border bg-card">

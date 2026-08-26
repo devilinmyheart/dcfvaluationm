@@ -12,7 +12,7 @@ import { FcfChart } from "@/components/dcf/FcfChart";
 import { RevenueEbitdaChart } from "@/components/dcf/RevenueEbitdaChart";
 import { Section } from "@/components/dcf/fields";
 import { getCompanyFinancials } from "@/lib/marketdata.functions";
-import { defaultAssumptions, sensitivity, valuate, type Assumptions } from "@/lib/dcf";
+import { currencySymbol, defaultAssumptions, sensitivity, valuate, type Assumptions } from "@/lib/dcf";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -57,7 +57,7 @@ function Index() {
   const valuation = useMemo(() => (assumptions ? valuate(assumptions) : null), [assumptions]);
   const grid = useMemo(() => (assumptions ? sensitivity(assumptions) : null), [assumptions]);
 
-  const currency = financials?.currency === "USD" ? "$" : "";
+  const currency = currencySymbol(financials?.currency);
   const errorMessage = query.error instanceof Error ? query.error.message : null;
 
   return (
