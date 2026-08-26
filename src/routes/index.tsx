@@ -57,7 +57,7 @@ function Index() {
   const valuation = useMemo(() => (assumptions ? valuate(assumptions) : null), [assumptions]);
   const grid = useMemo(() => (assumptions ? sensitivity(assumptions) : null), [assumptions]);
 
-  const currency = financials?.currency === "USD" ? "$" : "";
+  const currency = currencySymbol(financials?.currency);
   const errorMessage = query.error instanceof Error ? query.error.message : null;
 
   return (
