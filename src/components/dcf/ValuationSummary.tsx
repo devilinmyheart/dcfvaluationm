@@ -15,7 +15,9 @@ export function ValuationSummary({
   netDebt: number;
   shares: number;
 }) {
+  const sym = currencySymbol(currency);
   const upside = price > 0 ? v.intrinsicPerShare / price - 1 : Number.NaN;
+
   const verdict = !Number.isFinite(upside)
     ? { label: "Not computable", tone: "text-muted-foreground" }
     : upside > 0.15
