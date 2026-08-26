@@ -176,9 +176,10 @@ export const searchCompanies = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<CompanyMatch[]> => {
     const apiKey = process.env["FMP_API_KEY"];
-    if (!apiKey || data.query.length < 2) return [];
+    if (data.query.length < 2) return [];
 
     const safe = async (path: string): Promise<Json[]> => {
+      if (!apiKey) return [];
       try {
         return await fmp(path, { query: data.query, limit: "10" }, apiKey);
       } catch {
@@ -186,24 +187,39 @@ export const searchCompanies = createServerFn({ method: "GET" })
       }
     };
 
-    const [byName, bySymbol] = await Promise.all([
+    const yahoo = async (): Promise<CompanyMatch[]> => {
+      try {
+        const { searchYahoo } = await import("./yahoo.server");
+        return await searchYahoo(data.query);
+      } catch {
+        return [];
+      }
+    };
+
+    const [byName, bySymbol, global] = await Promise.all([
       safe("/stable/search-name"),
       safe("/stable/search-symbol"),
+      yahoo(),
     ]);
 
     const seen = new Set<string>();
     const out: CompanyMatch[] = [];
+    const push = (m: CompanyMatch) => {
+      if (!m.symbol || seen.has(m.symbol) || out.length >= 10) return;
+      seen.add(m.symbol);
+      out.push(m);
+    };
+
     for (const r of [...bySymbol, ...byName]) {
-      const symbol = String(r["symbol"] ?? "").toUpperCase();
-      if (!symbol || seen.has(symbol)) continue;
-      seen.add(symbol);
-      out.push({
-        symbol,
-        name: String(r["name"] ?? r["companyName"] ?? symbol),
+      push({
+        symbol: String(r["symbol"] ?? "").toUpperCase(),
+        name: String(r["name"] ?? r["companyName"] ?? r["symbol"] ?? ""),
         exchange: String(r["exchangeFullName"] ?? r["exchange"] ?? ""),
         currency: String(r["currency"] ?? ""),
       });
-      if (out.length >= 8) break;
     }
+    for (const m of global) push(m);
+
     return out;
   });
+
