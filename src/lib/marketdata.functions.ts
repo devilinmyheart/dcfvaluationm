@@ -53,20 +53,40 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
     const symbol = String(input?.symbol ?? "")
       .trim()
       .toUpperCase();
-    if (!/^[A-Z0-9.\-^]{1,12}$/.test(symbol)) throw new Error("Enter a valid ticker symbol.");
+    if (!/^[A-Z0-9.\-^]{1,15}$/.test(symbol)) throw new Error("Enter a valid ticker symbol.");
     return { symbol };
   })
   .handler(async ({ data }): Promise<CompanyFinancials> => {
-    const apiKey = process.env["FMP_API_KEY"];
-    if (!apiKey) throw new Error("Market data API key is not configured.");
     const { symbol } = data;
+    const apiKey = process.env["FMP_API_KEY"];
 
+    const yahoo = async (): Promise<CompanyFinancials> => {
+      const { fetchYahooFinancials } = await import("./yahoo.server");
+      return fetchYahooFinancials(symbol);
+    };
+
+    if (!apiKey) return yahoo();
+
+    try {
+      return await fetchFromFmp(symbol, apiKey);
+    } catch (err) {
+      try {
+        return await yahoo();
+      } catch {
+        throw err instanceof Error ? err : new Error(`No financial data found for "${symbol}".`);
+      }
+    }
+  });
+
+async function fetchFromFmp(symbol: string, apiKey: string): Promise<CompanyFinancials> {
+  {
     const [profileRows, income, cashflow, balance] = await Promise.all([
       fetchStable("/stable/profile", symbol, apiKey),
       fetchStable("/stable/income-statement", symbol, apiKey, 5),
       fetchStable("/stable/cash-flow-statement", symbol, apiKey, 5),
       fetchStable("/stable/balance-sheet-statement", symbol, apiKey, 5),
     ]);
+
 
 
     const profile = profileRows[0];
