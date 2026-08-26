@@ -158,7 +158,9 @@ async function fetchFromFmp(symbol: string, apiKey: string): Promise<CompanyFina
       cash: num(latestBs["cashAndShortTermInvestments"] ?? latestBs["cashAndCashEquivalents"]),
       history,
     };
-  });
+  }
+}
+
 
 export type CompanyMatch = {
   symbol: string;
