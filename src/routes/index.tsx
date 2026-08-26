@@ -12,7 +12,7 @@ import { FcfChart } from "@/components/dcf/FcfChart";
 import { RevenueEbitdaChart } from "@/components/dcf/RevenueEbitdaChart";
 import { Section } from "@/components/dcf/fields";
 import { getCompanyFinancials } from "@/lib/marketdata.functions";
-import { defaultAssumptions, sensitivity, valuate, type Assumptions } from "@/lib/dcf";
+import { currencySymbol, defaultAssumptions, sensitivity, valuate, type Assumptions } from "@/lib/dcf";
 
 export const Route = createFileRoute("/")({
   head: () => ({
