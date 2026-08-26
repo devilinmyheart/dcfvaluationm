@@ -251,12 +251,38 @@ export function defaultAssumptions(f: CompanyFinancials): Assumptions {
   };
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  INR: "₹",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+  CNY: "¥",
+  HKD: "HK$",
+  AUD: "A$",
+  CAD: "C$",
+  SGD: "S$",
+  CHF: "CHF ",
+  BRL: "R$",
+  ZAR: "R",
+  KRW: "₩",
+  SEK: "kr ",
+};
+
+/** Maps an ISO currency code to a display symbol (falls back to "CODE "). */
+export function currencySymbol(code?: string | null) {
+  const key = (code ?? "").toUpperCase();
+  if (!key) return "";
+  return CURRENCY_SYMBOLS[key] ?? `${key} `;
+}
+
 const compact = (n: number, currency: string) => {
   const abs = Math.abs(n);
   const unit = abs >= 1e12 ? ["T", 1e12] : abs >= 1e9 ? ["B", 1e9] : abs >= 1e6 ? ["M", 1e6] : ["", 1];
   const v = n / (unit[1] as number);
   return `${currency}${v.toFixed(abs >= 1e6 ? 2 : 0)}${unit[0]}`;
 };
+
 
 export function fmtMoney(n: number, currency = "$") {
   if (!Number.isFinite(n)) return "n/a";
