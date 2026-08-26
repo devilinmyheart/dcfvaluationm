@@ -1,5 +1,6 @@
 import type { Valuation } from "@/lib/dcf";
-import { fmtMoney, fmtPct, fmtPrice } from "@/lib/dcf";
+import { currencySymbol, fmtMoney, fmtPct, fmtPrice } from "@/lib/dcf";
+
 
 export function ValuationSummary({
   v,
