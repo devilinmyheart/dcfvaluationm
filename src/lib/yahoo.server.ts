@@ -3,7 +3,7 @@ import type { CompanyFinancials, HistoryYear } from "./dcf";
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-type Session = { cookie: string; crumb: string; at: number };
+type Session = { cookie: string; crumb: string; at: number; diag: string };
 let session: Session | null = null;
 
 async function getSession(): Promise<Session> {
@@ -26,19 +26,27 @@ async function getSession(): Promise<Session> {
   }
 
   let crumb = "";
-  try {
-    const res = await fetch("https://query1.finance.yahoo.com/v1/test/getcrumb", {
-      headers: { "User-Agent": UA, ...(cookie ? { Cookie: cookie } : {}) },
-    });
-    const text = (await res.text()).trim();
-    if (res.ok && text && text.length < 32 && !text.startsWith("<")) crumb = text;
-  } catch {
-    crumb = "";
+  let diag = "";
+  for (const host of ["query1", "query2"]) {
+    try {
+      const res = await fetch(`https://${host}.finance.yahoo.com/v1/test/getcrumb`, {
+        headers: { "User-Agent": UA, Accept: "*/*", ...(cookie ? { Cookie: cookie } : {}) },
+      });
+      const text = (await res.text()).trim();
+      diag += `${host}:${res.status}:${text.slice(0, 20)} `;
+      if (res.ok && text && text.length < 32 && !text.startsWith("<")) {
+        crumb = text;
+        break;
+      }
+    } catch (e) {
+      diag += `${host}:err `;
+    }
   }
 
-  session = { cookie, crumb, at: Date.now() };
+  session = { cookie, crumb, at: Date.now(), diag };
   return session;
 }
+
 
 async function yfetch(url: string): Promise<unknown> {
   const s = await getSession();
