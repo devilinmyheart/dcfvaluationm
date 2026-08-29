@@ -11,7 +11,7 @@ async function getSession(): Promise<Session> {
 
   let cookie = "";
   try {
-    const res = await fetch("https://fc.yahoo.com", { headers: { "User-Agent": UA } });
+    const res = await fetch("https://fc.yahoo.com", { headers: {} });
     const raw =
       typeof (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === "function"
         ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie().join("; ")
@@ -29,7 +29,7 @@ async function getSession(): Promise<Session> {
   for (const host of ["query1", "query2"]) {
     try {
       const res = await fetch(`https://${host}.finance.yahoo.com/v1/test/getcrumb`, {
-        headers: { "User-Agent": UA, Accept: "*/*", ...(cookie ? { Cookie: cookie } : {}) },
+        headers: { Accept: "*/*", ...(cookie ? { Cookie: cookie } : {}) },
       });
       const text = (await res.text()).trim();
       if (res.ok && text && text.length < 32 && !text.startsWith("<")) {
@@ -53,7 +53,7 @@ async function yfetch(url: string): Promise<unknown> {
     const s = await getSession();
     const withCrumb = s.crumb ? `${url}${url.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}` : url;
     const res = await fetch(withCrumb, {
-      headers: { "User-Agent": UA, Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
+      headers: { Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
     });
     const text = await res.text();
     if (res.ok) {
