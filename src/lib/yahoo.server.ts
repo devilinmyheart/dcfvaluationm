@@ -1,62 +1,84 @@
 import type { CompanyFinancials, HistoryYear } from "./dcf";
 
-const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-
 type Session = { cookie: string; crumb: string; at: number };
 let session: Session | null = null;
+
+async function cookieFrom(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { headers: {} });
+    const gsc = (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+    const list = gsc.length ? gsc : [res.headers.get("set-cookie") ?? ""];
+    return list
+      .map((c) => c.split(";")[0]?.trim() ?? "")
+      .filter((c) => c.includes("="))
+      .join("; ");
+  } catch {
+    return "";
+  }
+}
 
 async function getSession(): Promise<Session> {
   if (session && Date.now() - session.at < 30 * 60_000) return session;
 
-  let cookie = "";
-  try {
-    const res = await fetch("https://fc.yahoo.com", { headers: { "User-Agent": UA } });
-    const raw =
-      typeof (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === "function"
-        ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie().join("; ")
-        : (res.headers.get("set-cookie") ?? "");
-    cookie = raw
-      .split(/,(?=[^;]+?=)/)
-      .map((c) => c.split(";")[0]?.trim() ?? "")
-      .filter(Boolean)
-      .join("; ");
-  } catch {
-    cookie = "";
-  }
+  const cookie = (await cookieFrom("https://fc.yahoo.com")) || (await cookieFrom("https://finance.yahoo.com/"));
 
   let crumb = "";
-  try {
-    const res = await fetch("https://query1.finance.yahoo.com/v1/test/getcrumb", {
-      headers: { "User-Agent": UA, ...(cookie ? { Cookie: cookie } : {}) },
-    });
-    const text = (await res.text()).trim();
-    if (res.ok && text && text.length < 32 && !text.startsWith("<")) crumb = text;
-  } catch {
-    crumb = "";
+  for (const host of ["query1", "query2"]) {
+    try {
+      const res = await fetch(`https://${host}.finance.yahoo.com/v1/test/getcrumb`, {
+        headers: { Accept: "*/*", ...(cookie ? { Cookie: cookie } : {}) },
+      });
+      const text = (await res.text()).trim();
+      if (res.ok && text && text.length < 32 && !text.startsWith("<") && !/\s/.test(text)) {
+        crumb = text;
+        break;
+      }
+    } catch {
+      /* try next host */
+    }
   }
 
   session = { cookie, crumb, at: Date.now() };
   return session;
 }
 
+
+
+
 async function yfetch(url: string): Promise<unknown> {
-  const s = await getSession();
-  const withCrumb = s.crumb ? `${url}${url.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}` : url;
-  const res = await fetch(withCrumb, {
-    headers: { "User-Agent": UA, Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
-  });
-  const text = await res.text();
-  if (!res.ok) {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const s = await getSession();
+    const host = attempt % 2 === 0 ? "query1" : "query2";
+    const target = url.replace(/^https:\/\/query\d/, `https://${host}`);
+    const withCrumb = s.crumb
+      ? `${target}${target.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}`
+      : target;
+    const res = await fetch(withCrumb, {
+      headers: { Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
+    });
+    const text = await res.text();
+    if (res.ok) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("The backup data source returned an unreadable response.");
+      }
+    }
+    lastStatus = res.status;
     session = null;
-    throw new Error(`Yahoo request failed [${res.status}]`);
+    if (![401, 403, 429, 503].includes(res.status)) break;
+    await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
   }
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Yahoo returned an unreadable response.");
+  if (lastStatus === 429 || lastStatus === 503) {
+    throw new Error(
+      "The backup data source is rate-limiting requests right now. Wait a minute and try this ticker again.",
+    );
   }
+  throw new Error(`Backup data source request failed [${lastStatus}].`);
 }
+
+
 
 const raw = (v: unknown): number => {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
@@ -115,16 +137,23 @@ async function fetchTimeseries(symbol: string): Promise<Series> {
 }
 
 export async function fetchYahooFinancials(symbol: string): Promise<CompanyFinancials> {
-  const [series, quoteJson] = await Promise.all([
+  const [series, chartJson] = await Promise.all([
     fetchTimeseries(symbol),
     yfetch(
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price,defaultKeyStatistics`,
-    ) as Promise<{ quoteSummary?: { result?: Array<Record<string, unknown>> } }>,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
+    ) as Promise<{ chart?: { result?: Array<Record<string, unknown>> } }>,
   ]);
 
-  const result = quoteJson.quoteSummary?.result?.[0] ?? {};
-  const price = (result["price"] ?? {}) as Record<string, unknown>;
-  const stats = (result["defaultKeyStatistics"] ?? {}) as Record<string, unknown>;
+  const meta = (chartJson.chart?.result?.[0]?.["meta"] ?? {}) as Record<string, unknown>;
+  const price: Record<string, unknown> = {
+    regularMarketPrice: meta["regularMarketPrice"],
+    longName: meta["longName"],
+    shortName: meta["shortName"],
+    exchangeName: meta["fullExchangeName"] ?? meta["exchangeName"],
+    currency: meta["currency"],
+  };
+  const stats: Record<string, unknown> = {};
+
 
   const get = (type: string, year: number) => series.get(type)?.get(year) ?? 0;
   const years = [...(series.get("annualTotalRevenue")?.keys() ?? [])].sort((a, b) => a - b);

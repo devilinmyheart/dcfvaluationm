@@ -72,9 +72,17 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
     } catch (err) {
       try {
         return await yahoo();
-      } catch {
-        throw err instanceof Error ? err : new Error(`No financial data found for "${symbol}".`);
+      } catch (yerr) {
+        // FMP's plan error is misleading for non-US tickers; surface the fallback's reason.
+        throw yerr instanceof Error
+          ? yerr
+          : err instanceof Error
+            ? err
+            : new Error(`No financial data found for "${symbol}".`);
       }
+
+
+
     }
   });
 
