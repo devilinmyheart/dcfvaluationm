@@ -46,9 +46,13 @@ async function getSession(): Promise<Session> {
 
 async function yfetch(url: string): Promise<unknown> {
   let lastStatus = 0;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     const s = await getSession();
-    const withCrumb = s.crumb ? `${url}${url.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}` : url;
+    const host = attempt % 2 === 0 ? "query1" : "query2";
+    const target = url.replace(/^https:\/\/query\d/, `https://${host}`);
+    const withCrumb = s.crumb
+      ? `${target}${target.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}`
+      : target;
     const res = await fetch(withCrumb, {
       headers: { Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
     });
@@ -62,8 +66,8 @@ async function yfetch(url: string): Promise<unknown> {
     }
     lastStatus = res.status;
     session = null;
-    if (res.status !== 429 && res.status !== 503) break;
-    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    if (![401, 403, 429, 503].includes(res.status)) break;
+    await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
   }
   if (lastStatus === 429 || lastStatus === 503) {
     throw new Error(
@@ -72,6 +76,7 @@ async function yfetch(url: string): Promise<unknown> {
   }
   throw new Error(`Backup data source request failed [${lastStatus}].`);
 }
+
 
 
 const raw = (v: unknown): number => {
