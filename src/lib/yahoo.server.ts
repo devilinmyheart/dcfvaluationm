@@ -49,8 +49,9 @@ async function yfetch(url: string): Promise<unknown> {
   const text = await res.text();
   if (!res.ok) {
     session = null;
-    throw new Error(`Yahoo request failed [${res.status}]`);
+    throw new Error(`Yahoo request failed [${res.status}] crumb=${s.crumb.length} cookie=${s.cookie.length}`);
   }
+
   try {
     return JSON.parse(text);
   } catch {
