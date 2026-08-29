@@ -19,6 +19,8 @@ export function TickerSearch({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const search = useServerFn(searchCompanies);
+  const searchRef = useRef(search);
+  searchRef.current = search;
   const pickedRef = useRef(false);
 
   useEffect(() => {
@@ -34,7 +36,8 @@ export function TickerSearch({
     }
     let cancelled = false;
     const t = setTimeout(() => {
-      search({ data: { query: q } })
+      searchRef
+        .current({ data: { query: q } })
         .then((rows) => {
           if (cancelled) return;
           setMatches(rows);
@@ -52,7 +55,8 @@ export function TickerSearch({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [value, search]);
+  }, [value]);
+
 
   const pick = (symbol: string) => {
     pickedRef.current = true;
