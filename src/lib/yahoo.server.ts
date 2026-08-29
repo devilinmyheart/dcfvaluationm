@@ -137,16 +137,23 @@ async function fetchTimeseries(symbol: string): Promise<Series> {
 }
 
 export async function fetchYahooFinancials(symbol: string): Promise<CompanyFinancials> {
-  const [series, quoteJson] = await Promise.all([
+  const [series, chartJson] = await Promise.all([
     fetchTimeseries(symbol),
     yfetch(
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price,defaultKeyStatistics`,
-    ) as Promise<{ quoteSummary?: { result?: Array<Record<string, unknown>> } }>,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
+    ) as Promise<{ chart?: { result?: Array<Record<string, unknown>> } }>,
   ]);
 
-  const result = quoteJson.quoteSummary?.result?.[0] ?? {};
-  const price = (result["price"] ?? {}) as Record<string, unknown>;
-  const stats = (result["defaultKeyStatistics"] ?? {}) as Record<string, unknown>;
+  const meta = (chartJson.chart?.result?.[0]?.["meta"] ?? {}) as Record<string, unknown>;
+  const price: Record<string, unknown> = {
+    regularMarketPrice: meta["regularMarketPrice"],
+    longName: meta["longName"],
+    shortName: meta["shortName"],
+    exchangeName: meta["fullExchangeName"] ?? meta["exchangeName"],
+    currency: meta["currency"],
+  };
+  const stats: Record<string, unknown> = {};
+
 
   const get = (type: string, year: number) => series.get(type)?.get(year) ?? 0;
   const years = [...(series.get("annualTotalRevenue")?.keys() ?? [])].sort((a, b) => a - b);
