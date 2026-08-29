@@ -3,7 +3,7 @@ import type { CompanyFinancials, HistoryYear } from "./dcf";
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-type Session = { cookie: string; crumb: string; at: number; diag: string };
+type Session = { cookie: string; crumb: string; at: number };
 let session: Session | null = null;
 
 async function getSession(): Promise<Session> {
