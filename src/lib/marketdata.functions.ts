@@ -73,9 +73,11 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
       try {
         return await yahoo();
       } catch (yerr) {
-        console.error("[marketdata] fmp failed:", err, "yahoo failed:", yerr);
-        throw err instanceof Error ? err : new Error(`No financial data found for "${symbol}".`);
+        throw new Error(
+          `DEBUG fmp=${err instanceof Error ? err.message : String(err)} | yahoo=${yerr instanceof Error ? yerr.message : String(yerr)}`,
+        );
       }
+
 
     }
   });
