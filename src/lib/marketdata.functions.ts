@@ -73,10 +73,14 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
       try {
         return await yahoo();
       } catch (yerr) {
-        throw new Error(
-          `DEBUG fmp=${err instanceof Error ? err.message : String(err)} | yahoo=${yerr instanceof Error ? yerr.message : String(yerr)}`,
-        );
+        // FMP's plan error is misleading for non-US tickers; surface the fallback's reason.
+        throw yerr instanceof Error
+          ? yerr
+          : err instanceof Error
+            ? err
+            : new Error(`No financial data found for "${symbol}".`);
       }
+
 
 
     }
