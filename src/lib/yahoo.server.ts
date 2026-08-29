@@ -3,24 +3,24 @@ import type { CompanyFinancials, HistoryYear } from "./dcf";
 type Session = { cookie: string; crumb: string; at: number };
 let session: Session | null = null;
 
+async function cookieFrom(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { headers: {} });
+    const gsc = (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+    const list = gsc.length ? gsc : [res.headers.get("set-cookie") ?? ""];
+    return list
+      .map((c) => c.split(";")[0]?.trim() ?? "")
+      .filter((c) => c.includes("="))
+      .join("; ");
+  } catch {
+    return "";
+  }
+}
+
 async function getSession(): Promise<Session> {
   if (session && Date.now() - session.at < 30 * 60_000) return session;
 
-  let cookie = "";
-  try {
-    const res = await fetch("https://fc.yahoo.com", { headers: {} });
-    const raw =
-      typeof (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === "function"
-        ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie().join("; ")
-        : (res.headers.get("set-cookie") ?? "");
-    cookie = raw
-      .split(/,(?=[^;]+?=)/)
-      .map((c) => c.split(";")[0]?.trim() ?? "")
-      .filter(Boolean)
-      .join("; ");
-  } catch {
-    cookie = "";
-  }
+  const cookie = (await cookieFrom("https://fc.yahoo.com")) || (await cookieFrom("https://finance.yahoo.com/"));
 
   let crumb = "";
   for (const host of ["query1", "query2"]) {
@@ -29,7 +29,7 @@ async function getSession(): Promise<Session> {
         headers: { Accept: "*/*", ...(cookie ? { Cookie: cookie } : {}) },
       });
       const text = (await res.text()).trim();
-      if (res.ok && text && text.length < 32 && !text.startsWith("<")) {
+      if (res.ok && text && text.length < 32 && !text.startsWith("<") && !/\s/.test(text)) {
         crumb = text;
         break;
       }
@@ -41,6 +41,7 @@ async function getSession(): Promise<Session> {
   session = { cookie, crumb, at: Date.now() };
   return session;
 }
+
 
 
 
