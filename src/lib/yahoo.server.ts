@@ -49,23 +49,34 @@ async function getSession(): Promise<Session> {
 
 
 async function yfetch(url: string): Promise<unknown> {
-  const s = await getSession();
-  const withCrumb = s.crumb ? `${url}${url.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}` : url;
-  const res = await fetch(withCrumb, {
-    headers: { "User-Agent": UA, Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
-  });
-  const text = await res.text();
-  if (!res.ok) {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const s = await getSession();
+    const withCrumb = s.crumb ? `${url}${url.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(s.crumb)}` : url;
+    const res = await fetch(withCrumb, {
+      headers: { "User-Agent": UA, Accept: "application/json", ...(s.cookie ? { Cookie: s.cookie } : {}) },
+    });
+    const text = await res.text();
+    if (res.ok) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("The backup data source returned an unreadable response.");
+      }
+    }
+    lastStatus = res.status;
     session = null;
-    throw new Error(`Yahoo request failed [${res.status}] crumb=${s.crumb.length} cookie=${s.cookie.length} diag=${s.diag}`);
+    if (res.status !== 429 && res.status !== 503) break;
+    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
   }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Yahoo returned an unreadable response.");
+  if (lastStatus === 429 || lastStatus === 503) {
+    throw new Error(
+      "The backup data source is rate-limiting requests right now. Wait a minute and try this ticker again.",
+    );
   }
+  throw new Error(`Backup data source request failed [${lastStatus}].`);
 }
+
 
 const raw = (v: unknown): number => {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
