@@ -26,26 +26,25 @@ async function getSession(): Promise<Session> {
   }
 
   let crumb = "";
-  let diag = "";
   for (const host of ["query1", "query2"]) {
     try {
       const res = await fetch(`https://${host}.finance.yahoo.com/v1/test/getcrumb`, {
         headers: { "User-Agent": UA, Accept: "*/*", ...(cookie ? { Cookie: cookie } : {}) },
       });
       const text = (await res.text()).trim();
-      diag += `${host}:${res.status}:${text.slice(0, 20)} `;
       if (res.ok && text && text.length < 32 && !text.startsWith("<")) {
         crumb = text;
         break;
       }
-    } catch (e) {
-      diag += `${host}:err `;
+    } catch {
+      /* try next host */
     }
   }
 
-  session = { cookie, crumb, at: Date.now(), diag };
+  session = { cookie, crumb, at: Date.now() };
   return session;
 }
+
 
 
 async function yfetch(url: string): Promise<unknown> {
