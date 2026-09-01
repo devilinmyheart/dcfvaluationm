@@ -23,6 +23,10 @@ export type CompanyFinancials = {
   totalDebt: number;
   cash: number;
   history: HistoryYear[];
+  /** ISO timestamp of when this data was fetched from the provider (cached results). */
+  asOf?: string;
+  /** True when served from cache because live sources were unavailable. */
+  stale?: boolean;
 };
 
 export type TerminalMethod = "perpetuity" | "exit-multiple";
