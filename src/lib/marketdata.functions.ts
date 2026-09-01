@@ -250,6 +250,11 @@ export const searchCompanies = createServerFn({ method: "GET" })
     }
     for (const m of global) push(m);
 
-    return out;
+    if (out.length) {
+      searchCache.set(key, { at: Date.now(), rows: out });
+      if (searchCache.size > 200) searchCache.delete(searchCache.keys().next().value as string);
+      return out;
+    }
+    return hit?.rows ?? out;
   });
 
