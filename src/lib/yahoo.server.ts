@@ -45,7 +45,14 @@ async function getSession(): Promise<Session> {
 
 
 
+let blockedUntil = 0;
+
+const THROTTLED_MSG =
+  "The backup data source is rate-limiting requests right now. Wait a minute and try this ticker again.";
+
 async function yfetch(url: string): Promise<unknown> {
+  if (Date.now() < blockedUntil) throw new Error(THROTTLED_MSG);
+
   let lastStatus = 0;
   for (let attempt = 0; attempt < 4; attempt++) {
     const s = await getSession();
@@ -68,12 +75,17 @@ async function yfetch(url: string): Promise<unknown> {
     lastStatus = res.status;
     session = null;
     if (![401, 403, 429, 503].includes(res.status)) break;
-    await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const wait = Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.min(retryAfter * 1000, 5000)
+      : 400 * 2 ** attempt + Math.random() * 300;
+    await new Promise((r) => setTimeout(r, wait));
   }
   if (lastStatus === 429 || lastStatus === 503) {
-    throw new Error(
-      "The backup data source is rate-limiting requests right now. Wait a minute and try this ticker again.",
-    );
+    // Short circuit breaker: stop hammering a throttled source for the next minute.
+    blockedUntil = Date.now() + 60_000;
+    throw new Error(THROTTLED_MSG);
   }
   throw new Error(`Backup data source request failed [${lastStatus}].`);
 }
