@@ -192,6 +192,8 @@ export type CompanyMatch = {
   currency: string;
 };
 
+const searchCache = new Map<string, { at: number; rows: CompanyMatch[] }>();
+
 export const searchCompanies = createServerFn({ method: "GET" })
   .inputValidator((input: { query: string }) => {
     const q = String(input?.query ?? "").trim().slice(0, 60);
@@ -200,6 +202,11 @@ export const searchCompanies = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<CompanyMatch[]> => {
     const apiKey = process.env["FMP_API_KEY"];
     if (data.query.length < 2) return [];
+
+    const key = data.query.toLowerCase();
+    const hit = searchCache.get(key);
+    if (hit && Date.now() - hit.at < 30 * 60_000) return hit.rows;
+
 
     const safe = async (path: string): Promise<Json[]> => {
       if (!apiKey) return [];
