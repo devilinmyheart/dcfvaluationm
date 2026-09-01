@@ -31,7 +31,7 @@ export async function writeCachedFinancials(symbol: string, payload: CompanyFina
     await db
       .from("financials_cache")
       .upsert(
-        { symbol, payload: payload as unknown as Record<string, unknown>, fetched_at: new Date().toISOString() },
+        { symbol, payload: payload as never, fetched_at: new Date().toISOString() },
         { onConflict: "symbol" },
       );
   } catch {
