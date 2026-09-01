@@ -60,29 +60,44 @@ export const getCompanyFinancials = createServerFn({ method: "GET" })
     const { symbol } = data;
     const apiKey = process.env["FMP_API_KEY"];
 
+    const { readCachedFinancials, writeCachedFinancials, isFresh } = await import("./cache.server");
+
+    const cached = await readCachedFinancials(symbol);
+    if (cached && isFresh(cached.fetchedAt)) {
+      return { ...cached.data, asOf: cached.fetchedAt };
+    }
+
     const yahoo = async (): Promise<CompanyFinancials> => {
       const { fetchYahooFinancials } = await import("./yahoo.server");
       return fetchYahooFinancials(symbol);
     };
 
-    if (!apiKey) return yahoo();
+    const fresh = async (): Promise<CompanyFinancials> => {
+      if (!apiKey) return yahoo();
+      try {
+        return await fetchFromFmp(symbol, apiKey);
+      } catch (err) {
+        try {
+          return await yahoo();
+        } catch (yerr) {
+          // FMP's plan error is misleading for non-US tickers; surface the fallback's reason.
+          throw yerr instanceof Error
+            ? yerr
+            : err instanceof Error
+              ? err
+              : new Error(`No financial data found for "${symbol}".`);
+        }
+      }
+    };
 
     try {
-      return await fetchFromFmp(symbol, apiKey);
+      const live = await fresh();
+      const fetchedAt = new Date().toISOString();
+      await writeCachedFinancials(symbol, live);
+      return { ...live, asOf: fetchedAt };
     } catch (err) {
-      try {
-        return await yahoo();
-      } catch (yerr) {
-        // FMP's plan error is misleading for non-US tickers; surface the fallback's reason.
-        throw yerr instanceof Error
-          ? yerr
-          : err instanceof Error
-            ? err
-            : new Error(`No financial data found for "${symbol}".`);
-      }
-
-
-
+      if (cached) return { ...cached.data, asOf: cached.fetchedAt, stale: true };
+      throw err;
     }
   });
 
