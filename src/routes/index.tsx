@@ -95,6 +95,12 @@ function Index() {
 
       {financials && assumptions && valuation && grid ? (
         <div className="space-y-6">
+          {financials.stale && financials.asOf ? (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Live data source is busy — showing cached figures as of{" "}
+              {new Date(financials.asOf).toLocaleString()}.
+            </div>
+          ) : null}
           <CompanyHeader f={financials} />
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
